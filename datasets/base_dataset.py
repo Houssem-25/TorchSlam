@@ -10,8 +10,28 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import torch
 import yaml
-from dataset.base_sensor import *
 from torch.utils.data import Dataset
+
+
+class SensorType(Enum):
+    """Enum for diffrent sensor types supported by the datasets"""
+
+    RGB_CAMERA = 1
+    DEPTH_CAMERA = 2
+    IMU = 3
+    LIDAR = 4
+    GPS = 5
+    STEREO_CAMERA = 6
+    THERMAL_CAMERA = 7
+    EVENT_CAMERA = 8
+
+
+class SensorData:
+    """Base class for sensor data"""
+
+    def __init__(self, timestamp: float, sensor_id: str):
+        self.timestamp = timestamp
+        self.sensor_id = sensor_id
 
 
 class CalibrationData:
