@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Fetch the globally configured Git name and email
+NEW_NAME=$(git config --global user.name)
+NEW_EMAIL=$(git config --global user.email)
+
+# Check if the user name and email are set
+if [[ -z "$NEW_NAME" || -z "$NEW_EMAIL" ]]; then
+    echo "❌ Error: Your global Git name or email is not set."
+    echo "Run the following commands to set them first:"
+    echo "  git config --global user.name \"Your Name\""
+    echo "  git config --global user.email \"your-email@example.com\""
+    exit 1
+fi
+
+# Start an interactive rebase from the root commit
+git rebase -i --root
+
+# Amend all commits to use the new name and email
+git filter-branch --env-filter "
+    GIT_AUTHOR_NAME='$NEW_NAME'
+    GIT_AUTHOR_EMAIL='$NEW_EMAIL'
+    GIT_COMMITTER_NAME='$NEW_NAME'
+    GIT_COMMITTER_EMAIL='$NEW_EMAIL'
+" --tag-name-filter cat -- --branches --tags
+
+echo "✅ Successfully updated all commits with the globally configured name and email."
