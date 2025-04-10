@@ -391,40 +391,54 @@ def compute_fundamental_matrix_ransac(
     k = int(np.log(1 - confidence) / np.log(1 - w**8))
     k = min(max(k, 8), max_iterations)
 
-    # RANSAC loop
+    # RANSAC iterations
     for _ in range(k):
         # Randomly select 8 points
-        indices = torch.randperm(num_points)[:8]
-        selected_pts1 = pts1[indices]
-        selected_pts2 = pts2[indices]
+        indices = torch.randperm(num_points, device=device)[:8]
+        sample_pts1 = pts1[indices]
+        sample_pts2 = pts2[indices]
 
-        # Compute fundamental matrix using 8-point algorithm
-        F = compute_fundamental_matrix_8point(selected_pts1, selected_pts2)
+        try:
+            # Compute fundamental matrix from sample
+            F = compute_fundamental_matrix_8point(sample_pts1, sample_pts2)
 
-        # Compute epipolar distances
-        distances = compute_epipolar_distances(F, pts1, pts2)
+            # Compute epipolar distances for all points
+            distances = compute_epipolar_distances(F, pts1, pts2)
 
-        # Determine inliers
-        inlier_mask = distances < ransac_threshold
-        num_inliers = torch.sum(inlier_mask).item()
+            # Find inliers
+            inlier_mask = distances < ransac_threshold
+            num_inliers = inlier_mask.sum().item()
 
-        # Update best model if we found more inliers
-        if num_inliers > best_num_inliers:
-            best_num_inliers = num_inliers
-            best_inlier_mask = inlier_mask
-            best_F = F
+            # Update best solution if better
+            if num_inliers > best_num_inliers:
+                best_num_inliers = num_inliers
+                best_inlier_mask = inlier_mask
+                best_F = F
 
-            # Update inlier ratio estimate and number of iterations
-            w = num_inliers / num_points
-            k_new = int(np.log(1 - confidence) / np.log(1 - w**8))
-            k = min(k_new, max_iterations)
+                # Update inlier ratio estimate
+                w = num_inliers / num_points
+                k = int(np.log(1 - confidence) / np.log(1 - w**8))
+                k = min(max(k, 8), max_iterations)
 
-    # Refine F matrix using all inliers
-    if best_num_inliers >= 8:
-        refined_F = compute_fundamental_matrix_8point(
-            pts1[best_inlier_mask], pts2[best_inlier_mask]
+        except RuntimeError as e:
+            # Handle numerical errors in fundamental matrix computation
+            continue
+
+    # If no good solution found, return identity matrix
+    if best_num_inliers < 8:
+        return torch.eye(3, device=device), torch.zeros(
+            num_points, dtype=torch.bool, device=device
         )
-        return refined_F, best_inlier_mask
+
+    # Refine fundamental matrix using all inliers
+    if best_num_inliers > 8:
+        inlier_pts1 = pts1[best_inlier_mask]
+        inlier_pts2 = pts2[best_inlier_mask]
+        try:
+            best_F = compute_fundamental_matrix_8point(inlier_pts1, inlier_pts2)
+        except RuntimeError:
+            # If refinement fails, keep the previous best solution
+            pass
 
     return best_F, best_inlier_mask
 

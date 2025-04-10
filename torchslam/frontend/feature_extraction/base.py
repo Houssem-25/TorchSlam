@@ -130,7 +130,7 @@ class BaseFeatureExtractor:
         elif image.dim() == 3 and image.shape[0] == 1:
             gray = image
         elif image.dim() == 2:
-            gray = image.unsqueeze(0)
+            gray = image.unsqueeze(0)  # Becomes (1, H, W)
         else:
             raise ValueError(f"Unsupported image format with shape {image.shape}")
 
@@ -140,6 +140,10 @@ class BaseFeatureExtractor:
 
         if gray.max() > 1.0 + 1e-6:
             gray = gray / 255.0
+
+        # Ensure output is 4D (N, C, H, W)
+        if gray.dim() == 3:
+            gray = gray.unsqueeze(0)  # Add batch dimension N=1
 
         return gray
 

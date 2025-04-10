@@ -6,6 +6,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from .base import BaseFeatureExtractor, KeyPoint
+
 
 class SIFTFeatureExtractor(BaseFeatureExtractor):
     """SIFT (Scale-Invariant Feature Transform) feature detector and descriptor.

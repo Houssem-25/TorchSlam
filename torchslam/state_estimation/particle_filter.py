@@ -411,12 +411,52 @@ class RaoBlackwellizedParticleFilter(ParticleFilter):
 
                 if feature_mean is not None:
                     # Update feature using EKF update
-                    # TODO: Implement feature update
-                    pass
+                    # Compute measurement Jacobian
+                    H = self._compute_measurement_jacobian(particle.state, feature_mean)
+
+                    # Compute innovation covariance
+                    S = (
+                        torch.matmul(H, torch.matmul(feature_cov, H.t()))
+                        + measurement_noise
+                    )
+
+                    # Compute Kalman gain
+                    try:
+                        S_inv = torch.inverse(S)
+                    except RuntimeError:
+                        # Add small regularization if inversion fails
+                        reg_S = S + torch.eye(S.shape[0], device=self.device) * 1e-8
+                        S_inv = torch.inverse(reg_S)
+
+                    K = torch.matmul(feature_cov, torch.matmul(H.t(), S_inv))
+
+                    # Update feature mean and covariance
+                    innovation = measurement - measurement_func(particle.state)
+                    feature_mean = feature_mean + torch.matmul(K, innovation)
+                    feature_cov = torch.matmul(
+                        torch.eye(feature_cov.shape[0], device=self.device)
+                        - torch.matmul(K, H),
+                        feature_cov,
+                    )
+
+                    # Ensure covariance is symmetric
+                    feature_cov = 0.5 * (feature_cov + feature_cov.t())
+
+                    # Update feature in map
+                    self.particle_maps[i][feature_id] = (feature_mean, feature_cov)
                 else:
                     # Initialize new feature
-                    # TODO: Implement feature initialization
-                    pass
+                    # Use measurement as initial estimate
+                    feature_mean = measurement
+
+                    # Initialize covariance with large uncertainty
+                    feature_cov = (
+                        torch.eye(measurement.shape[0], device=self.device)
+                        * self.initial_feature_uncertainty
+                    )
+
+                    # Add to map
+                    self.particle_maps[i][feature_id] = (feature_mean, feature_cov)
 
             # Predict measurement for this particle
             predicted_measurement = measurement_func(particle.state)

@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import torch
 
+from ...frontend.feature_extraction.base import KeyPoint
+
 
 class TrackStatus(Enum):
     """Status of a feature track."""
@@ -148,9 +150,129 @@ class BaseTracker(ABC):
         self.min_distance = self.config.get("min_distance", 10)
         self.max_age = self.config.get("max_age", 100)
         self.max_frames_lost = self.config.get("max_frames_lost", 3)
+        self.min_quality = self.config.get("min_quality", 0.1)
+        self.max_quality = self.config.get("max_quality", 1.0)
 
         # Initialize logger
         self.logger = logging.getLogger(self.__class__.__name__)
+
+    def initialize_tracks(
+        self,
+        keypoints: List[KeyPoint],
+        descriptors: Optional[torch.Tensor] = None,
+        quality_scores: Optional[torch.Tensor] = None,
+    ):
+        """
+        Initialize tracks from keypoints.
+
+        Args:
+            keypoints: List of keypoints
+            descriptors: Tensor of descriptors (optional)
+            quality_scores: Tensor of quality scores (optional)
+        """
+        if not keypoints:
+            return
+
+        # Filter keypoints by quality if scores are provided
+        if quality_scores is not None:
+            valid_mask = (quality_scores >= self.min_quality) & (
+                quality_scores <= self.max_quality
+            )
+            keypoints = [kp for kp, valid in zip(keypoints, valid_mask) if valid]
+            if descriptors is not None:
+                descriptors = descriptors[valid_mask]
+            if quality_scores is not None:
+                quality_scores = quality_scores[valid_mask]
+
+        # Check if we need to remove old tracks to make room
+        if len(self.tracks) + len(keypoints) > self.max_tracks:
+            self._prune_tracks(len(keypoints))
+
+        # Initialize new tracks
+        for i, kp in enumerate(keypoints):
+            track_id = self.next_feature_id
+            desc = descriptors[i].unsqueeze(0) if descriptors is not None else None
+            quality = quality_scores[i].item() if quality_scores is not None else 1.0
+
+            self.tracks[track_id] = Track(
+                track_id=track_id,
+                keypoint=kp,
+                descriptor=desc,
+                quality=quality,
+                frame_idx=self.current_frame_idx,
+            )
+            self.next_feature_id += 1
+
+    def _prune_tracks(self, num_new_tracks: int):
+        """
+        Prune old tracks to make room for new ones.
+
+        Args:
+            num_new_tracks: Number of new tracks to be added
+        """
+        # Sort tracks by age and quality
+        sorted_tracks = sorted(
+            self.tracks.items(),
+            key=lambda x: (
+                self.current_frame_idx - x[1].frame_idx,
+                -x[1].quality,
+            ),
+        )
+
+        # Remove oldest/lowest quality tracks
+        num_to_remove = len(self.tracks) + num_new_tracks - self.max_tracks
+        for track_id, _ in sorted_tracks[:num_to_remove]:
+            del self.tracks[track_id]
+
+    def update_track_quality(self, track_id: int, quality: float):
+        """
+        Update quality score of a track.
+
+        Args:
+            track_id: ID of the track to update
+            quality: New quality score
+        """
+        if track_id in self.tracks:
+            self.tracks[track_id].quality = max(
+                self.min_quality, min(quality, self.max_quality)
+            )
+
+    def get_active_tracks(self) -> Dict[int, Track]:
+        """
+        Get all active tracks.
+
+        Returns:
+            Dictionary of active tracks
+        """
+        return {
+            track_id: track
+            for track_id, track in self.tracks.items()
+            if track.status == TrackStatus.ACTIVE
+        }
+
+    def get_track_statistics(self) -> Dict[str, int]:
+        """
+        Get statistics about tracks.
+
+        Returns:
+            Dictionary containing track statistics
+        """
+        stats = {
+            "total": len(self.tracks),
+            "active": 0,
+            "lost": 0,
+            "terminated": 0,
+        }
+
+        for track in self.tracks.values():
+            if track.status == TrackStatus.ACTIVE:
+                stats["active"] += 1
+            elif track.status == TrackStatus.LOST:
+                stats["lost"] += 1
+            elif track.status == TrackStatus.TERMINATED:
+                stats["terminated"] += 1
+
+        return stats
 
     @abstractmethod
     def track_features(
@@ -171,20 +293,6 @@ class BaseTracker(ABC):
             Dictionary of track_id to Track object
         """
         pass
-
-    def initialize_tracks(self, keypoints, descriptors: Optional[torch.Tensor] = None):
-        """
-        Initialize tracks from keypoints.
-
-        Args:
-            keypoints: List of keypoints
-            descriptors: Tensor of descriptors (optional)
-        """
-        for i, kp in enumerate(keypoints):
-            track_id = self.next_feature_id
-            desc = descriptors[i].unsqueeze(0) if descriptors is not None else None
-            self.tracks[track_id] = Track(track_id, kp, desc)
-            self.next_feature_id += 1
 
     def update_track(
         self, track_id: int, keypoint, descriptor: Optional[torch.Tensor] = None
@@ -225,19 +333,6 @@ class BaseTracker(ABC):
 
         for track_id in track_ids_to_remove:
             self.remove_track(track_id)
-
-    def get_active_tracks(self) -> Dict[int, Track]:
-        """
-        Get currently active tracks.
-
-        Returns:
-            Dictionary of active tracks (track_id -> Track)
-        """
-        return {
-            tid: track
-            for tid, track in self.tracks.items()
-            if track.status == TrackStatus.TRACKED or track.status == TrackStatus.NEW
-        }
 
     def get_active_keypoints(self) -> List:
         """

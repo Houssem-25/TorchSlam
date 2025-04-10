@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from ..feature_extraction import FeatureMatcher
+from ..feature_extraction import FeatureMatcher, MatchingMethod
 from .base import BaseOdometry, FramePose, OdometryStatus
 
 
@@ -48,10 +48,14 @@ class PnPOdometry(BaseOdometry):
         self.method = self.config.get("method", "epnp")
         self.use_extrinsic_guess = self.config.get("use_extrinsic_guess", False)
 
-        # Initialize feature matcher
+        # Initialize feature matcher (pass relevant config options)
+        # Use defaults suitable for PnP context if not specified in config
         self.matcher = FeatureMatcher(
-            match_threshold=self.config.get("match_threshold", 0.7),
-            cross_check=self.config.get("cross_check", True),
+            method=self.config.get("matcher_method", MatchingMethod.RATIO_TEST),
+            ratio_threshold=self.config.get("matcher_ratio_threshold", 0.7),
+            cross_check=self.config.get("matcher_cross_check", True),
+            max_distance=self.config.get("matcher_max_distance", float("inf")),
+            num_neighbors=self.config.get("matcher_num_neighbors", 2),
         )
 
         # Store previous frame data

@@ -1,4 +1,4 @@
-# PyTorch SLAM Library
+# TorchSLAM Library
 
 ## Overview
 This library provides a comprehensive framework for implementing and experimenting with SLAM systems. It leverages PyTorch's computational capabilities, automatic differentiation, and GPU acceleration to create a flexible, modular, and extensible SLAM solution.
@@ -39,4 +39,3 @@ This library provides a comprehensive framework for implementing and experimenti
 - Uncertainty propagation
 
 ## System Architecture
-

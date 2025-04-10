@@ -5,20 +5,31 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "torchslam"
 version = "0.1.0"
-description = "Python Boilerplate contains all the boilerplate you need to create a Python package."
-readme = "README.rst"
+description = "A PyTorch-based library for SLAM"
+readme = "README.md"
+requires-python = ">=3.8"
 authors = [
-  {name = "Houssem Boulahbal", email = "44366101+Houssem-25@users.noreply.github.com"}
+  {name = "Houssem Boulahbal", email = "houssem.boulahbal@gmail.com"}
 ]
 maintainers = [
-  {name = "Houssem Boulahbal", email = "44366101+Houssem-25@users.noreply.github.com"}
+  {name = "Houssem Boulahbal", email = "houssem.boulahbal@gmail.com"}
 ]
 classifiers = [
-
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
 ]
 license = {text = "MIT license"}
 dependencies = [
-
+    "torch>=1.9.0",
+    "numpy>=1.20.0",
+    "opencv-python>=4.5.0",
+    "scipy>=1.7.0",
+    "matplotlib>=3.4.0",
+    "tqdm>=4.60.0",
 ]
 
 [project.optional-dependencies]
@@ -30,13 +41,12 @@ dev = [
 ]
 
 [project.urls]
-
-bugs = "https://github.com/Houssem/torchslam/issues"
-changelog = "https://github.com/Houssem/torchslam/blob/master/changelog.md"
-homepage = "https://github.com/Houssem/torchslam"
+bugs = "https://github.com/Houssem-25/torchslam/issues"
+changelog = "https://github.com/Houssem-25/torchslam/blob/master/changelog.md"
+homepage = "https://github.com/Houssem-25/torchslam"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+packages = ["torchslam"]
 
 [tool.setuptools.package-data]
 "*" = ["*.*"]

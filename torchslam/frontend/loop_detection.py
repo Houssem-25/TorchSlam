@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from .keyframe import Keyframe, KeyframeManager
 from .odometry.base import FramePose
